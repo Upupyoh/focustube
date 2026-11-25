@@ -10,9 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Set up Java Development Kit
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -24,14 +25,32 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Auto-Detect Project and Build APK
+        run: |
+          # ফোল্ডার বা সাব-ফোল্ডার থেকে pubspec.yaml খুঁজে নেওয়া
+          if [ -f "pubspec.yaml" ]; then
+            TARGET_DIR="."
+          else
+            TARGET_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \; | head -n 1)
+          fi
+          echo "Target Directory: $TARGET_DIR"
+          cd "$TARGET_DIR"
 
-      - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons
+          # মিসিং অ্যান্ড্রয়েড গ্র্যাডেল ও সিস্টেম ফাইল স্বয়ংক্রিয় তৈরি
+          flutter create . --platforms=android --org com.focustube
 
-      - name: Upload APK Artifact
+          # ডিপেন্ডেন্সি ইনস্টল
+          flutter pub get
+
+          # রিলিজ APK বিল্ড
+          flutter build apk --release --no-tree-shake-icons
+
+          # ডাউনলোড করার জন্য APK কপি করা
+          mkdir -p $GITHUB_WORKSPACE/output_apk
+          cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/output_apk/FocusTube-release.apk
+
+      - name: Upload FocusTube APK
         uses: actions/upload-artifact@v4
         with:
           name: FocusTube-Release-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: output_apk/FocusTube-release.apk
